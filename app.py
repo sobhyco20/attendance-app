@@ -500,11 +500,28 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
 
     try:
 
-        logo = Image(
-            "logo.png",
-            width=120,
-            height=30
-        )
+        import os
+
+        logo_path = "assets/logo.png"
+
+        if os.path.exists(logo_path):
+
+            try:
+
+                logo = Image(
+                    logo_path,
+                    width=120,
+                    height=30
+                )
+
+                elements.append(logo)
+
+                elements.append(
+                    Spacer(1, 5)
+                )
+
+            except:
+                pass
 
         elements.append(logo)
 
