@@ -757,6 +757,39 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
 
         elements.append(details_table)
 
+        # =====================================================
+        # SIGNATURE
+        # =====================================================
+
+        elements.append(
+            Spacer(1, 30)
+        )
+
+        try:
+
+            sign = Image(
+                "sign.png",
+                width=140,
+                height=70
+            )
+
+            sign_table = Table(
+                [[sign]],
+                colWidths=[500]
+            )
+
+            sign_table.setStyle(
+                TableStyle([
+                    ("ALIGN", (0,0), (-1,-1), "RIGHT"),
+                ])
+            )
+
+            elements.append(sign_table)
+
+        except:
+            pass
+
+
     doc.build(elements)
 
     buffer.seek(0)
@@ -809,11 +842,13 @@ summary_df, details_df = build_report(
 
 
 with st.sidebar:
+
     st.header("🔍 اختيار الموظف")
 
     employee_options = ["كل الموظفين"]
 
     for _, row in summary_df.iterrows():
+
         employee_options.append(
             f'{row["employee_id"]} - {row["Arabic name"] or row["Name"]}'
         )
@@ -823,6 +858,27 @@ with st.sidebar:
         employee_options
     )
 
+    # =========================================
+    # SIDEBAR FOOTER LOGO
+    # =========================================
+
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+
+    c1, c2, c3 = st.columns([1,2,1])
+
+    with c2:
+
+        try:
+
+            st.image(
+                "sing.png",
+                width=170
+            )
+
+        except:
+            pass
+
+    st.markdown("<br>", unsafe_allow_html=True)
 
 filtered_summary = summary_df.copy()
 filtered_details = details_df.copy()
