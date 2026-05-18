@@ -498,39 +498,34 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
     # LOGO
     # =====================================================
 
-    try:
+    # =====================================================
+    # LOGO
+    # =====================================================
 
-        import os
+    import os
 
-        logo_path = "assets/logo.png"
+    logo_path = "assets/logo.png"
 
-        if os.path.exists(logo_path):
+    if os.path.exists(logo_path):
 
-            try:
+        try:
 
-                logo = Image(
-                    logo_path,
-                    width=120,
-                    height=30
-                )
+            logo = Image(
+                logo_path,
+                width=120,
+                height=30
+            )
 
-                elements.append(logo)
+            elements.append(logo)
 
-                elements.append(
-                    Spacer(1, 5)
-                )
+            elements.append(
+                Spacer(1, 5)
+            )
 
-            except:
-                pass
+        except Exception:
+            pass
 
-        elements.append(logo)
 
-        elements.append(
-            Spacer(1, 5)
-        )
-
-    except:
-        pass
 
     for emp_index, (_, emp) in enumerate(summary_df.iterrows()):
 
@@ -777,35 +772,43 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
         # =====================================================
         # SIGNATURE
         # =====================================================
+        # =====================================================
+        # SIGNATURE
+        # =====================================================
 
-        elements.append(
-            Spacer(1, 30)
-        )
+        import os
 
-        try:
+        sign_path = "assets/sign.png"
 
-            sign = Image(
-                "sign.png",
-                width=140,
-                height=70
-            )
+        if os.path.exists(sign_path):
 
-            sign_table = Table(
-                [[sign]],
-                colWidths=[500]
-            )
+            try:
 
-            sign_table.setStyle(
-                TableStyle([
-                    ("ALIGN", (0,0), (-1,-1), "RIGHT"),
-                ])
-            )
+                elements.append(
+                    Spacer(1, 30)
+                )
 
-            elements.append(sign_table)
+                sign = Image(
+                    sign_path,
+                    width=140,
+                    height=70
+                )
 
-        except:
-            pass
+                sign_table = Table(
+                    [[sign]],
+                    colWidths=[500]
+                )
 
+                sign_table.setStyle(
+                    TableStyle([
+                        ("ALIGN", (0,0), (-1,-1), "RIGHT"),
+                    ])
+                )
+
+                elements.append(sign_table)
+
+            except Exception:
+                pass
 
     doc.build(elements)
 
@@ -967,7 +970,7 @@ for _, emp in filtered_summary.iterrows():
             try:
 
                 st.image(
-                    "logo.png",
+                    "assets/logo.png",
                     width=120
                 )
 
