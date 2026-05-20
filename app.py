@@ -768,7 +768,21 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
             ]
         ]
 
-        summary_table = Table(summary_data, repeatRows=1)
+        summary_table = Table(
+                summary_data,
+                repeatRows=1,
+                colWidths=[
+                    55,
+                    95,
+                    80,
+                    55,
+                    55,
+                    65,
+                    65,
+                    65,
+                    65,
+                ]
+            )
 
         summary_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, -1), font_name),
@@ -776,7 +790,10 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("TOPPADDING", (0,0), (-1,-1), 6),
         ]))
 
         elements.append(summary_table)
@@ -800,15 +817,26 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
                 format_num(d["early_hours"]),
             ])
 
-        details_table = Table(details_data, repeatRows=1)
-
+        details_table = Table(
+                details_data,
+                repeatRows=1,
+                colWidths=[
+                    75,
+                    75,
+                    75,
+                    65,
+                    65,
+                    65,
+                    65,
+                ]
+            )
         details_table.setStyle(TableStyle([
             ("FONTNAME", (0, 0), (-1, -1), font_name),
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
             ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
             ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 8),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [
                 colors.white,
                 colors.HexColor("#f8fafc")
