@@ -289,7 +289,7 @@ def calc_work_hours(row):
         if end_dt < start_dt:
             end_dt += pd.Timedelta(days=1)
 
-        return round((end_dt - start_dt).total_seconds() / 3600, 2)
+        return (end_dt - start_dt).total_seconds() / 3600
 
     except Exception:
         return 0.0
@@ -355,6 +355,371 @@ def load_employees():
     emp_df = emp_df.drop_duplicates(subset=["employee_id"])
 
     return emp_df
+
+
+def build_report(att_df, emp_df, start_date, end_date):
+
+    att_df = clean_columns(att_df)
+
+    # =====================================================
+    # VALIDATION
+    # =====================================================
+
+    if "AC-No." not in att_df.columns:
+
+        st.error(
+            "❌ ملف البصمة لا يحتوي على عمود AC-No."
+        )
+
+        st.stop()
+
+    if "Date" not in att_df.columns:
+
+        st.error(
+            "❌ ملف البصمة لا يحتوي على عمود Date"
+        )
+
+        st.stop()
+
+    # =====================================================
+    # REQUIRED COLUMNS
+    # =====================================================
+
+    for col in [
+        "Clock In",
+        "Clock Out",
+        "ATT_Time",
+        "OT Time",
+        "Late",
+        "Early"
+    ]:
+
+        if col not in att_df.columns:
+
+            att_df[col] = 0
+
+    # =====================================================
+    # EMPLOYEE ID
+    # =====================================================
+
+    att_df["employee_id"] = pd.to_numeric(
+        att_df["AC-No."],
+        errors="coerce"
+    )
+
+    att_df = att_df.dropna(
+        subset=["employee_id"]
+    )
+
+    att_df["employee_id"] = (
+        att_df["employee_id"]
+        .astype(int)
+    )
+
+    # =====================================================
+    # DATE
+    # =====================================================
+
+    att_df["Date"] = pd.to_datetime(
+        att_df["Date"],
+        errors="coerce"
+    ).dt.date
+
+    att_df = att_df.dropna(
+        subset=["Date"]
+    )
+
+    # =====================================================
+    # FILTER PERIOD
+    # =====================================================
+
+    att_df = att_df[
+        (att_df["Date"] >= start_date)
+        &
+        (att_df["Date"] <= end_date)
+    ].copy()
+
+    if att_df.empty:
+
+        st.warning(
+            "⚠️ لا توجد بيانات داخل الفترة المحددة."
+        )
+
+        st.stop()
+
+    # =====================================================
+    # CALCULATIONS
+    # =====================================================
+
+    att_df["work_hours"] = att_df.apply(
+        calc_work_hours,
+        axis=1
+    )
+
+    att_df["overtime_hours"] = (
+        att_df["OT Time"]
+        .apply(parse_duration_to_hours)
+    )
+
+    att_df["late_hours"] = (
+        att_df["Late"]
+        .apply(parse_duration_to_hours)
+    )
+
+    att_df["early_hours"] = (
+        att_df["Early"]
+        .apply(parse_duration_to_hours)
+    )
+
+    # =====================================================
+    # SUMMARY
+    # =====================================================
+
+    summary = att_df.groupby(
+        "employee_id",
+        as_index=False
+    ).agg(
+
+        attendance_days=(
+            "Date",
+            "nunique"
+        ),
+
+        first_date=(
+            "Date",
+            "min"
+        ),
+
+        last_date=(
+            "Date",
+            "max"
+        ),
+
+        work_hours=(
+            "work_hours",
+            "sum"
+        ),
+
+        overtime_hours=(
+            "overtime_hours",
+            "sum"
+        ),
+
+        late_hours=(
+            "late_hours",
+            "sum"
+        ),
+
+        early_hours=(
+            "early_hours",
+            "sum"
+        ),
+    )
+
+    # =====================================================
+    # MERGE EMPLOYEES
+    # =====================================================
+
+    emp_cols = [
+
+        "employee_id",
+
+        "Name",
+
+        "Arabic name",
+
+        "Nationality",
+
+        "Section | Department",
+
+        "attendance_calculation",
+    ]
+
+    summary = summary.merge(
+
+        emp_df[emp_cols],
+
+        on="employee_id",
+
+        how="left"
+    )
+
+    # =====================================================
+    # FILL NULLS
+    # =====================================================
+
+    for col in [
+
+        "Name",
+
+        "Arabic name",
+
+        "Nationality",
+
+        "Section | Department",
+
+        "attendance_calculation"
+
+    ]:
+
+        summary[col] = (
+            summary[col]
+            .fillna("")
+        )
+
+    # =====================================================
+    # ROUND
+    # =====================================================
+
+    for col in [
+
+        "work_hours",
+
+        "overtime_hours",
+
+        "late_hours",
+
+        "early_hours"
+
+    ]:
+
+        summary[col] = (
+            summary[col]
+            .round(4)
+        )
+
+    # =====================================================
+    # DETAILS
+    # =====================================================
+
+    details = att_df.drop(
+        columns=["Name"],
+        errors="ignore"
+    )
+
+    details = details.merge(
+
+        emp_df[
+            [
+                "employee_id",
+                "Name",
+                "Arabic name",
+                "Nationality",
+                "Section | Department",
+            ]
+        ],
+
+        on="employee_id",
+
+        how="left",
+
+        suffixes=("", "_emp")
+    )
+
+    # =====================================================
+    # FIX COLUMN NAMES
+    # =====================================================
+
+    if "Name" not in details.columns:
+
+        if "Name_emp" in details.columns:
+
+            details["Name"] = details["Name_emp"]
+
+        elif "Name_x" in details.columns:
+
+            details["Name"] = details["Name_x"]
+
+        elif "Name_y" in details.columns:
+
+            details["Name"] = details["Name_y"]
+
+        else:
+
+            details["Name"] = ""
+
+    if "Arabic name" not in details.columns:
+
+        if "Arabic name_emp" in details.columns:
+
+            details["Arabic name"] = (
+                details["Arabic name_emp"]
+            )
+
+        elif "Arabic name_x" in details.columns:
+
+            details["Arabic name"] = (
+                details["Arabic name_x"]
+            )
+
+        elif "Arabic name_y" in details.columns:
+
+            details["Arabic name"] = (
+                details["Arabic name_y"]
+            )
+
+        else:
+
+            details["Arabic name"] = ""
+
+    # =====================================================
+    # FILL NULLS
+    # =====================================================
+
+    for col in [
+
+        "Name",
+
+        "Arabic name",
+
+        "Nationality",
+
+        "Section | Department"
+
+    ]:
+
+        details[col] = (
+            details[col]
+            .fillna("")
+        )
+
+    # =====================================================
+    # FINAL COLUMNS
+    # =====================================================
+
+    details = details[
+        [
+            "employee_id",
+            "Arabic name",
+            "Name",
+            "Nationality",
+            "Section | Department",
+            "Date",
+            "Clock In",
+            "Clock Out",
+            "ATT_Time",
+            "OT Time",
+            "work_hours",
+            "overtime_hours",
+            "late_hours",
+            "early_hours",
+        ]
+    ]
+
+    # =====================================================
+    # SORT
+    # =====================================================
+
+    summary = summary.sort_values(
+        ["Section | Department", "employee_id"]
+    )
+
+    details = details.sort_values(
+        ["employee_id", "Date"]
+    )
+
+    return summary, details
+
 
 
 def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
@@ -1100,23 +1465,25 @@ for _, emp in filtered_summary.iterrows():
     with k2:
 
         st.metric(
-            "ساعات العمل",
-            round(emp["work_hours"], 2)
-        )
+        "ساعات العمل",
+        format_num(emp["work_hours"])
+    )
 
     with k3:
 
+
         st.metric(
             "الإضافي",
-            round(emp["overtime_hours"], 2)
+            format_num(emp["overtime_hours"])
         )
-
     with k4:
+
 
         st.metric(
             "التأخير",
-            round(emp["late_hours"], 2)
+            format_num(emp["late_hours"])
         )
+
 
     # =====================================================
     # END CARD
