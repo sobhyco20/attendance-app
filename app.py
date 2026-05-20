@@ -357,160 +357,23 @@ def load_employees():
     return emp_df
 
 
-def build_report(att_df, emp_df, start_date, end_date):
-    att_df = clean_columns(att_df)
-
-    if "AC-No." not in att_df.columns:
-        st.error("❌ ملف البصمة لا يحتوي على عمود AC-No.")
-        st.stop()
-
-    if "Date" not in att_df.columns:
-        st.error("❌ ملف البصمة لا يحتوي على عمود Date")
-        st.stop()
-
-    for col in ["Clock In", "Clock Out", "ATT_Time", "OT Time", "Late", "Early"]:
-        if col not in att_df.columns:
-            att_df[col] = 0
-
-    att_df["employee_id"] = pd.to_numeric(att_df["AC-No."], errors="coerce")
-    att_df = att_df.dropna(subset=["employee_id"])
-    att_df["employee_id"] = att_df["employee_id"].astype(int)
-
-    att_df["Date"] = pd.to_datetime(att_df["Date"], errors="coerce").dt.date
-    att_df = att_df.dropna(subset=["Date"])
-
-    att_df = att_df[
-        (att_df["Date"] >= start_date)
-        &
-        (att_df["Date"] <= end_date)
-    ].copy()
-
-    if att_df.empty:
-        st.warning("⚠️ لا توجد بيانات داخل الفترة المحددة.")
-        st.stop()
-
-    att_df["work_hours"] = att_df.apply(calc_work_hours, axis=1)
-    att_df["overtime_hours"] = att_df["OT Time"].apply(parse_duration_to_hours)
-    att_df["late_hours"] = att_df["Late"].apply(parse_duration_to_hours)
-    att_df["early_hours"] = att_df["Early"].apply(parse_duration_to_hours)
-
-    summary = att_df.groupby("employee_id", as_index=False).agg(
-        attendance_days=("Date", "nunique"),
-        first_date=("Date", "min"),
-        last_date=("Date", "max"),
-        work_hours=("work_hours", "sum"),
-        overtime_hours=("overtime_hours", "sum"),
-        late_hours=("late_hours", "sum"),
-        early_hours=("early_hours", "sum"),
-    )
-
-    emp_cols = [
-        "employee_id",
-        "Name",
-        "Arabic name",
-        "Nationality",
-        "Section | Department",
-        "attendance_calculation",
-    ]
-
-    summary = summary.merge(
-        emp_df[emp_cols],
-        on="employee_id",
-        how="left"
-    )
-
-    for col in ["Name", "Arabic name", "Nationality", "Section | Department", "attendance_calculation"]:
-        summary[col] = summary[col].fillna("")
-
-    for col in ["work_hours", "overtime_hours", "late_hours", "early_hours"]:
-        summary[col] = summary[col].round(4)
-
-    details = att_df.drop(columns=["Name"], errors="ignore")
-
-    details = details.merge(
-        emp_df[
-            [
-                "employee_id",
-                "Name",
-                "Arabic name",
-                "Nationality",
-                "Section | Department",
-            ]
-        ],
-        on="employee_id",
-        how="left",
-        suffixes=("", "_emp")
-    )
-
-
-    # =====================================================
-    # FIX COLUMN NAMES
-    # =====================================================
-
-    if "Name" not in details.columns:
-
-        if "Name_emp" in details.columns:
-            details["Name"] = details["Name_emp"]
-
-        elif "Name_x" in details.columns:
-            details["Name"] = details["Name_x"]
-
-        elif "Name_y" in details.columns:
-            details["Name"] = details["Name_y"]
-
-        else:
-            details["Name"] = ""
-
-    if "Arabic name" not in details.columns:
-
-        if "Arabic name_emp" in details.columns:
-            details["Arabic name"] = details["Arabic name_emp"]
-
-        elif "Arabic name_x" in details.columns:
-            details["Arabic name"] = details["Arabic name_x"]
-
-        elif "Arabic name_y" in details.columns:
-            details["Arabic name"] = details["Arabic name_y"]
-
-        else:
-            details["Arabic name"] = ""
-            
-
-    for col in ["Name", "Arabic name", "Nationality", "Section | Department"]:
-        details[col] = details[col].fillna("")
-
-    details = details[
-        [
-            "employee_id",
-            "Arabic name",
-            "Name",
-            "Nationality",
-            "Section | Department",
-            "Date",
-            "Clock In",
-            "Clock Out",
-            "ATT_Time",
-            "OT Time",
-            "work_hours",
-            "overtime_hours",
-            "late_hours",
-            "early_hours",
-        ]
-    ]
-
-    summary = summary.sort_values(["Section | Department", "employee_id"])
-    details = details.sort_values(["employee_id", "Date"])
-
-    return summary, details
-
-
 def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
+
     buffer = BytesIO()
 
     try:
-        pdfmetrics.registerFont(TTFont("Arabic", "fonts/Amiri-Regular.ttf"))
+
+        pdfmetrics.registerFont(
+            TTFont(
+                "Arabic",
+                "fonts/Amiri-Regular.ttf"
+            )
+        )
+
         font_name = "Arabic"
+
     except Exception:
+
         font_name = "Helvetica"
 
     doc = SimpleDocTemplate(
@@ -546,10 +409,6 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
     # LOGO
     # =====================================================
 
-    # =====================================================
-    # LOGO
-    # =====================================================
-
     import os
 
     logo_path = "assets/logo.png"
@@ -573,24 +432,37 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
         except Exception:
             pass
 
-
+    # =====================================================
+    # EMPLOYEES LOOP
+    # =====================================================
 
     for emp_index, (_, emp) in enumerate(summary_df.iterrows()):
 
         emp_id = emp["employee_id"]
-        emp_details = details_df[details_df["employee_id"] == emp_id]
+
+        emp_details = details_df[
+            details_df["employee_id"] == emp_id
+        ]
 
         if emp_index > 0:
-            elements.append(PageBreak())
+
+            elements.append(
+                PageBreak()
+            )
+
+        # =====================================================
+        # TITLES
+        # =====================================================
 
         if lang == "ar":
+
             title = "ملخص الحضور الشهري"
-            emp_name = (
-                        f'{emp["Arabic name"]}<br/><font size="14">'
-                        f'{emp["Name"]}</font>'
-                    )
+
             dept = emp["Section | Department"]
-            period = f"الفترة من {start_date} إلى {end_date}"
+
+            period = (
+                f"الفترة من {start_date} إلى {end_date}"
+            )
 
             header = [
                 "كود الموظف",
@@ -615,14 +487,14 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
             ]
 
         else:
+
             title = "Monthly Attendance Summary"
 
-            emp_name = (
-                f'{emp["Arabic name"]}<br/>'
-                f'<font size="14">{emp["Name"]}</font>'
-            )
             dept = emp["Section | Department"]
-            period = f"Period from {start_date} to {end_date}"
+
+            period = (
+                f"Period from {start_date} to {end_date}"
+            )
 
             header = [
                 "Employee ID",
@@ -646,22 +518,34 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
                 "Early",
             ]
 
+        # =====================================================
+        # REPORT HEADER
+        # =====================================================
+
         elements.append(
             Paragraph(
-                ar_text(title) if lang == "ar" else title,
+                ar_text(title)
+                if lang == "ar"
+                else title,
                 title_style
             )
         )
 
         elements.append(
             Paragraph(
-                ar_text(period) if lang == "ar" else period,
+                ar_text(period)
+                if lang == "ar"
+                else period,
                 normal_style
             )
         )
 
+        elements.append(
+            Spacer(1, 15)
+        )
+
         # =====================================================
-        # EMPLOYEE HEADER
+        # EMPLOYEE NAME STYLE
         # =====================================================
 
         employee_header_style = ParagraphStyle(
@@ -684,42 +568,6 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
             textColor=colors.HexColor("#334155"),
         )
 
-        if lang == "ar":
-
-            employee_header = ar_text(emp_name)
-
-            employee_sub = ar_text(
-                f"الرقم الوظيفي: {emp_id} | الإدارة: {dept}"
-            )
-
-            arabic_name = ar_text(emp["Arabic name"])
-            english_name = emp["Name"]
-        else:
-
-            employee_header = emp_name
-
-            employee_sub = (
-                f"Employee ID: {emp_id} | Department: {dept}"
-            )
-
-            arabic_name = ar_text(emp["Arabic name"])
-            english_name = emp["Name"]
-
-        # =====================================================
-        # ARABIC NAME
-        # =====================================================
-
-        elements.append(
-            Paragraph(
-                arabic_name,
-                employee_header_style
-            )
-        )
-
-        # =====================================================
-        # ENGLISH NAME
-        # =====================================================
-
         english_style = ParagraphStyle(
             "english_style",
             parent=styles["Normal"],
@@ -728,6 +576,31 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
             leading=24,
             alignment=1,
             textColor=colors.HexColor("#64748b"),
+        )
+
+        arabic_name = ar_text(
+            emp["Arabic name"]
+        )
+
+        english_name = emp["Name"]
+
+        if lang == "ar":
+
+            employee_sub = ar_text(
+                f"الرقم الوظيفي: {emp_id} | الإدارة: {dept}"
+            )
+
+        else:
+
+            employee_sub = (
+                f"Employee ID: {emp_id} | Department: {dept}"
+            )
+
+        elements.append(
+            Paragraph(
+                arabic_name,
+                employee_header_style
+            )
         )
 
         elements.append(
@@ -745,114 +618,196 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
         )
 
         elements.append(
-            Spacer(1, 16)
+            Spacer(1, 18)
         )
 
-        elements.append(Spacer(1, 12))
+        # =====================================================
+        # SUMMARY TABLE
+        # =====================================================
 
         summary_data = [
+
             [
-                ar_text(h) if lang == "ar" else h
+                ar_text(h)
+                if lang == "ar"
+                else h
                 for h in header
             ],
+
             [
                 str(emp["employee_id"]),
-                ar_text(emp["Arabic name"]) if lang == "ar" else str(emp["Name"]),
-                ar_text(emp["Section | Department"]) if lang == "ar" else str(emp["Section | Department"]),
-                ar_text(emp["Nationality"]) if lang == "ar" else str(emp["Nationality"]),
+
+                ar_text(emp["Arabic name"])
+                if lang == "ar"
+                else str(emp["Name"]),
+
+                ar_text(emp["Section | Department"])
+                if lang == "ar"
+                else str(emp["Section | Department"]),
+
+                ar_text(emp["Nationality"])
+                if lang == "ar"
+                else str(emp["Nationality"]),
+
                 str(emp["attendance_days"]),
+
                 format_num(emp["work_hours"]),
+
                 format_num(emp["overtime_hours"]),
+
                 format_num(emp["late_hours"]),
+
                 format_num(emp["early_hours"]),
             ]
         ]
 
         summary_table = Table(
-                summary_data,
-                repeatRows=1,
-                colWidths=[
-                    55,
-                    95,
-                    80,
-                    55,
-                    55,
-                    65,
-                    65,
-                    65,
-                    65,
-                ]
-            )
+
+            summary_data,
+
+            repeatRows=1,
+
+            colWidths=[
+                55,
+                95,
+                80,
+                55,
+                55,
+                65,
+                65,
+                65,
+                65,
+            ]
+        )
 
         summary_table.setStyle(TableStyle([
+
             ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
-            ("VALIGN", (0,0), (-1,-1), "MIDDLE"),
-            ("BOTTOMPADDING", (0,0), (-1,-1), 6),
-            ("TOPPADDING", (0,0), (-1,-1), 6),
+
+            ("BACKGROUND", (0, 0), (-1, 0),
+             colors.HexColor("#0f172a")),
+
+            ("TEXTCOLOR", (0, 0), (-1, 0),
+             colors.white),
+
+            ("GRID", (0, 0), (-1, -1),
+             0.4, colors.grey),
+
+            ("ALIGN", (0, 0), (-1, -1),
+             "CENTER"),
+
+            ("VALIGN", (0,0), (-1,-1),
+             "MIDDLE"),
+
+            ("FONTSIZE", (0, 0), (-1, -1),
+             7),
+
+            ("BOTTOMPADDING", (0,0), (-1,-1),
+             6),
+
+            ("TOPPADDING", (0,0), (-1,-1),
+             6),
+
         ]))
 
         elements.append(summary_table)
-        elements.append(Spacer(1, 16))
+
+        elements.append(
+            Spacer(1, 18)
+        )
+
+        # =====================================================
+        # DETAILS TABLE
+        # =====================================================
 
         details_data = [
+
             [
-                ar_text(h) if lang == "ar" else h
+                ar_text(h)
+                if lang == "ar"
+                else h
                 for h in detail_header
             ]
         ]
 
         for _, d in emp_details.iterrows():
+
             details_data.append([
+
                 str(d["Date"]),
+
                 str(d["Clock In"]),
+
                 str(d["Clock Out"]),
+
                 format_num(d["work_hours"]),
+
                 format_num(d["overtime_hours"]),
+
                 format_num(d["late_hours"]),
+
                 format_num(d["early_hours"]),
             ])
 
         details_table = Table(
-                details_data,
-                repeatRows=1,
-                colWidths=[
-                    75,
-                    75,
-                    75,
-                    65,
-                    65,
-                    65,
-                    65,
-                ]
-            )
+
+            details_data,
+
+            repeatRows=1,
+
+            colWidths=[
+                75,
+                75,
+                75,
+                65,
+                65,
+                65,
+                65,
+            ]
+        )
+
         details_table.setStyle(TableStyle([
+
             ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e293b")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("FONTSIZE", (0, 0), (-1, -1), 7),
+
+            ("BACKGROUND", (0, 0), (-1, 0),
+             colors.HexColor("#1e293b")),
+
+            ("TEXTCOLOR", (0, 0), (-1, 0),
+             colors.white),
+
+            ("GRID", (0, 0), (-1, -1),
+             0.4, colors.grey),
+
+            ("ALIGN", (0, 0), (-1, -1),
+             "CENTER"),
+
+            ("VALIGN", (0,0), (-1,-1),
+             "MIDDLE"),
+
+            ("FONTSIZE", (0, 0), (-1, -1),
+             7),
+
+            ("BOTTOMPADDING", (0,0), (-1,-1),
+             6),
+
+            ("TOPPADDING", (0,0), (-1,-1),
+             6),
+
             ("ROWBACKGROUNDS", (0, 1), (-1, -1), [
                 colors.white,
                 colors.HexColor("#f8fafc")
             ]),
+
         ]))
 
-        elements.append(details_table)
+        elements.append(
+            details_table
+        )
 
         # =====================================================
         # SIGNATURE
         # =====================================================
-        # =====================================================
-        # SIGNATURE
-        # =====================================================
-
-        import os
 
         sign_path = "assets/sign.png"
 
@@ -881,7 +836,9 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
                     ])
                 )
 
-                elements.append(sign_table)
+                elements.append(
+                    sign_table
+                )
 
             except Exception:
                 pass
@@ -889,6 +846,7 @@ def create_pdf(summary_df, details_df, start_date, end_date, lang="ar"):
     doc.build(elements)
 
     buffer.seek(0)
+
     return buffer.getvalue()
 
 
