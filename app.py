@@ -198,35 +198,71 @@ def clean_columns(df):
     df.columns = [str(c).strip() for c in df.columns]
     return df
 
-
 def parse_duration_to_hours(value):
+
     if pd.isna(value):
         return 0.0
 
     try:
-        if isinstance(value, pd.Timedelta):
-            return round(value.total_seconds() / 3600, 2)
 
-        value = str(value).strip().replace("Õ", "").strip()
+        # =========================================
+        # TIMEDELTA
+        # =========================================
+
+        if isinstance(value, pd.Timedelta):
+
+            return value.total_seconds() / 3600
+
+        value = str(value).strip()
 
         if value.lower() in ["", "nan", "nat", "none"]:
             return 0.0
 
-        value = value.split()[0]
+        # =========================================
+        # REMOVE EXTRA TEXT
+        # =========================================
+
+        value = value.replace("Õ", "").strip()
+
+        # =========================================
+        # HANDLE DAYS FORMAT
+        # مثال:
+        # 1 days 02:30:15
+        # =========================================
+
+        if "day" in value.lower():
+
+            td = pd.to_timedelta(value)
+
+            return td.total_seconds() / 3600
+
+        # =========================================
+        # SPLIT HH:MM:SS
+        # =========================================
+
         parts = value.split(":")
 
         if len(parts) == 1:
+
             return float(parts[0])
 
-        h = int(parts[0])
-        m = int(parts[1])
-        s = int(parts[2]) if len(parts) > 2 else 0
+        hours = int(parts[0])
 
-        return round(h + (m / 60) + (s / 3600), 2)
+        minutes = int(parts[1])
+
+        seconds = int(parts[2]) if len(parts) > 2 else 0
+
+        total_hours = (
+            hours
+            + (minutes / 60)
+            + (seconds / 3600)
+        )
+
+        return total_hours
 
     except Exception:
-        return 0.0
 
+        return 0.0
 
 def calc_work_hours(row):
     att_hours = parse_duration_to_hours(row.get("ATT_Time", 0))
@@ -260,10 +296,22 @@ def calc_work_hours(row):
 
 
 def format_num(value):
+
     try:
-        return f"{float(value):,.2f}"
+
+        total_seconds = int(float(value) * 3600)
+
+        hours = total_seconds // 3600
+
+        minutes = (total_seconds % 3600) // 60
+
+        seconds = total_seconds % 60
+
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
+
     except Exception:
-        return "0.00"
+
+        return "00:00:00"
 
 
 def load_employees():
@@ -375,7 +423,7 @@ def build_report(att_df, emp_df, start_date, end_date):
         summary[col] = summary[col].fillna("")
 
     for col in ["work_hours", "overtime_hours", "late_hours", "early_hours"]:
-        summary[col] = summary[col].round(2)
+        summary[col] = summary[col].round(4)
 
     details = att_df.drop(columns=["Name"], errors="ignore")
 
